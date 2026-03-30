@@ -5,7 +5,7 @@ use std::path::Path;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::encryption::{derive_master_key, encrypt_raw_sms};
+use crate::encryption::{derive_master_key, encrypt_string};
 
 const SCHEMA: &[&str] = &[
     r#"CREATE TABLE IF NOT EXISTS transactions (
@@ -66,7 +66,8 @@ fn migrate(conn: &Connection) -> Result<()> {
 
 fn seed_categories(conn: &Connection) -> Result<()> {
     let now = OffsetDateTime::now_utc().format(&time::format_description::well_known::Rfc3339)?;
-    let defaults = ["Travel", "Food", "Income", "Miscellaneous"];
+    let defaults: Vec<String> =
+        serde_json::from_str(include_str!("../../shared/default_categories.json"))?;
     let tx = conn.transaction()?;
     for name in defaults {
         tx.execute(
@@ -89,7 +90,7 @@ pub fn insert_transaction(conn: &Connection, mut txn: serde_json::Value, aes_key
     obj.insert("updated_at".into(), serde_json::Value::String(now.clone()));
     obj.entry("created_at").or_insert_with(|| serde_json::Value::String(now.clone()));
     if let Some(raw_sms) = obj.get("raw_sms").and_then(|v| v.as_str()) {
-        let encrypted = encrypt_raw_sms(aes_key, raw_sms)?;
+        let encrypted = encrypt_string(aes_key, raw_sms)?;
         obj.insert("raw_sms".into(), serde_json::Value::String(encrypted));
     }
     conn.execute(

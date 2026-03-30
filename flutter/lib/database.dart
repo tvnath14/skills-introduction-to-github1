@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 import 'encryption_service.dart';
 
@@ -92,7 +94,8 @@ class DatabaseProvider {
 
   Future<void> _seedCategories(Database db) async {
     final now = DateTime.now().toUtc().toIso8601String();
-    final defaults = const ['Travel', 'Food', 'Income', 'Miscellaneous'];
+    final defaultsJson = await rootBundle.loadString('shared/default_categories.json');
+    final defaults = (jsonDecode(defaultsJson) as List<dynamic>).cast<String>();
     final batch = db.batch();
     for (final name in defaults) {
       batch.insert(

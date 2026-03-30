@@ -37,7 +37,7 @@ pub fn derive_master_key(master_password: &str, salt_path: &Path) -> Result<Mast
     Ok(MasterKey { key, salt })
 }
 
-pub fn encrypt_raw_sms(key: &[u8], plaintext: &str) -> Result<String> {
+pub fn encrypt_string(key: &[u8], plaintext: &str) -> Result<String> {
     let cipher = Aes256Gcm::new_from_slice(key)?;
     let mut nonce_bytes = [0u8; 12];
     OsRng.fill_bytes(&mut nonce_bytes);
@@ -48,7 +48,7 @@ pub fn encrypt_raw_sms(key: &[u8], plaintext: &str) -> Result<String> {
     Ok(base64::encode(payload))
 }
 
-pub fn decrypt_raw_sms(key: &[u8], payload: &str) -> Result<String> {
+pub fn decrypt_string(key: &[u8], payload: &str) -> Result<String> {
     let bytes = base64::decode(payload)?;
     let (nonce_bytes, ciphertext) = bytes.split_at(12);
     let cipher = Aes256Gcm::new_from_slice(key)?;

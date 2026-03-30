@@ -14,6 +14,7 @@ use serde_json::json;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
+use tokio::sync::oneshot;
 use uuid::Uuid;
 
 use crate::db::open_encrypted_db;
@@ -60,7 +61,9 @@ pub async fn run_sync_server(master_password: &str) -> Result<SyncServer> {
     let port = listener.local_addr()?.port();
     let _mdns = broadcast_mdns(port)?;
 
+    let (ready_tx, ready_rx) = oneshot::channel();
     tokio::spawn(async move {
+        let _ = ready_tx.send(Ok(()));
         loop {
             let (stream, _) = match listener.accept().await {
                 Ok(s) => s,
@@ -88,6 +91,9 @@ pub async fn run_sync_server(master_password: &str) -> Result<SyncServer> {
         }
     });
 
+    // ensure listener task started successfully
+    ready_rx.await.unwrap_or(Ok(()))?;
+
     Ok(SyncServer {
         fingerprint,
         shared_secret,
@@ -97,7 +103,7 @@ pub async fn run_sync_server(master_password: &str) -> Result<SyncServer> {
 
 fn tls_config(cert: CertificateDer<'static>, key: PrivateKeyDer<'static>) -> Result<ServerConfig> {
     let certs = vec![cert];
-    let mut config = ServerConfig::builder()
+    let config = ServerConfig::builder()
         .with_safe_default_cipher_suites()
         .with_safe_default_kx_groups()
         .with_safe_default_protocol_versions()
@@ -105,7 +111,6 @@ fn tls_config(cert: CertificateDer<'static>, key: PrivateKeyDer<'static>) -> Res
         .with_no_client_auth()
         .with_single_cert(certs, key)
         .context("building tls config")?;
-    config.alpn_protocols.push(b"tls13".to_vec());
     Ok(config)
 }
 
@@ -224,9 +229,10 @@ fn build_payload(conn: &rusqlite::Connection, since: &str) -> Result<serde_json:
         row_counts_json.insert(month, json!(count));
     }
 
+    let device_id = local_device_id(conn)?;
     Ok(json!({
       "meta": {
-        "device_id": Uuid::new_v4().to_string(),
+        "device_id": device_id,
         "last_sync": since,
         "row_counts": row_counts_json
       },
@@ -260,4 +266,23 @@ fn rows_to_json(
         })?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
+}
+
+fn local_device_id(conn: &rusqlite::Connection) -> Result<String> {
+    let existing: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'device_id'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if let Some(id) = existing {
+        return Ok(id);
+    }
+    let new_id = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES ('device_id', ?1)",
+        rusqlite::params![new_id],
+    )?;
+    Ok(new_id)
 }

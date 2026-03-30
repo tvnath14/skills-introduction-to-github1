@@ -70,6 +70,7 @@ class SyncClient {
         'last_sync': lastSync.toIso8601String(),
         'row_counts': await _rowCountsPerMonth(),
       },
+      'secret': device.sharedSecret,
       'transactions': deltas,
       'categories': categories,
       'settings': settings,
