@@ -122,7 +122,7 @@ class DatabaseProvider {
     payload['id'] ??= const Uuid().v4();
     payload['created_at'] ??= now;
     payload['updated_at'] = now;
-    payload['month'] ??= payload['date']?.toString().substring(0, 7);
+    payload['month'] ??= _deriveMonth(payload['date']);
 
     final rawSms = payload['raw_sms'];
     if (rawSms is String) {
@@ -160,5 +160,21 @@ class DatabaseProvider {
       where: 'id IN ($placeholders)',
       whereArgs: ids,
     );
+  }
+
+  String? _deriveMonth(dynamic date) {
+    if (date == null) return null;
+    if (date is String && date.length >= 7) {
+      return date.substring(0, 7);
+    }
+    if (date is DateTime) {
+      return date.toIso8601String().substring(0, 7);
+    }
+    final parsed = DateTime.tryParse(date.toString());
+    if (parsed != null) {
+      final iso = parsed.toIso8601String();
+      return iso.length >= 7 ? iso.substring(0, 7) : null;
+    }
+    return null;
   }
 }

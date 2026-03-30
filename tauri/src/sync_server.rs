@@ -85,7 +85,7 @@ pub async fn run_sync_server(master_password: &str) -> Result<SyncServer> {
                 )
                 .await;
                 if let Err(err) = result {
-                    eprintln!("sync session failed");
+                    eprintln!("sync session failed: {err}");
                 }
             });
         }

@@ -102,10 +102,12 @@ class SyncClient {
     await socket.close();
 
     final now = DateTime.now().toUtc().toIso8601String();
+    final remoteMeta = remotePayload['meta'] as Map<String, dynamic>?;
+    final remoteDeviceId = remoteMeta != null ? remoteMeta['device_id'] : null;
     await db.insert(
       'sync_state',
       {
-        'device_id': payload['meta']['device_id'],
+        'device_id': remoteDeviceId ?? deviceId,
         'last_sync': now,
         'peer_device_name': device.host,
         'peer_cert_fingerprint': device.fingerprint,
