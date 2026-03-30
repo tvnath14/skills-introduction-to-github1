@@ -179,7 +179,7 @@ async fn handle_client(
         return Ok(());
     }
     let payload: SyncPayload = serde_json::from_str(&line)?;
-    if payload.secret != shared_secret {
+    if !constant_time_eq(payload.secret.as_bytes(), shared_secret.as_bytes()) {
         return Err(anyhow!("shared secret mismatch"));
     }
     if let Some(fp) = &peer_cert_fp {
@@ -193,7 +193,7 @@ async fn handle_client(
             .optional()
             .context("fetching stored fingerprint")?;
         if let Some(stored_fp) = stored {
-            if stored_fp != *fp {
+            if !constant_time_eq(stored_fp.as_bytes(), fp.as_bytes()) {
                 return Err(anyhow!("pinned certificate mismatch"));
             }
         }
@@ -204,7 +204,7 @@ async fn handle_client(
     let conn = open_encrypted_db(master_password.as_ref(), salt_path, db_path)?;
     conn.execute(
         "INSERT OR REPLACE INTO sync_state (device_id, last_sync, peer_device_name, peer_cert_fingerprint) VALUES (?1, ?2, ?3, ?4)",
-        rusqlite::params![payload.meta.device_id, payload.meta.last_sync, peer_addr, peer_cert_fp],
+        rusqlite::params![payload.meta.device_id, payload.meta.last_sync, peer_addr.as_deref(), peer_cert_fp],
     )?;
 
     let response = build_payload(&conn, &payload.meta.last_sync)?;
@@ -213,6 +213,17 @@ async fn handle_client(
     writer.write_all(b"\n").await?;
     writer.flush().await?;
     Ok(())
+}
+
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
 }
 
 fn build_payload(conn: &rusqlite::Connection, since: &str) -> Result<serde_json::Value> {

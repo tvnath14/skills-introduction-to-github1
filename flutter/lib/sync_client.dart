@@ -85,14 +85,16 @@ class SyncClient {
         final fp = _fingerprintFromCert(cert);
         return fp == device.fingerprint;
       },
-      supportedProtocols: ['tls1.3'],
     );
 
     final encoded = const JsonEncoder().convert(payload);
     socket.write(encoded);
     socket.write('\n');
 
-    final response = await socket.transform(utf8.decoder).join();
+    final response = await socket
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .first;
     if (response.trim().isEmpty) {
       await socket.close();
       return;

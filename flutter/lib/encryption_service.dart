@@ -52,10 +52,11 @@ class EncryptionService {
     final nonce = _randomBytes(12);
     final secretBox =
         await _aesGcm.encrypt(utf8.encode(plaintext), secretKey: secretKey, nonce: nonce);
+    final macLength = _aesGcm.macAlgorithm.macLength;
     final payload = <int>[
       ...nonce,
       ...secretBox.cipherText,
-      ...secretBox.mac.bytes,
+      ...secretBox.mac.bytes.take(macLength),
     ];
     return base64Encode(payload);
   }
@@ -64,8 +65,9 @@ class EncryptionService {
   Future<String> decryptString(String encodedPayload) async {
     final bytes = base64Decode(encodedPayload);
     final nonce = bytes.sublist(0, 12);
-    final mac = Mac(bytes.sublist(bytes.length - 16));
-    final cipherText = bytes.sublist(12, bytes.length - 16);
+    final macLength = _aesGcm.macAlgorithm.macLength;
+    final mac = Mac(bytes.sublist(bytes.length - macLength));
+    final cipherText = bytes.sublist(12, bytes.length - macLength);
     final secretKey = await obtainColumnKey();
     final secretBox = SecretBox(cipherText, nonce: nonce, mac: mac);
     final clear = await _aesGcm.decrypt(secretBox, secretKey: secretKey);

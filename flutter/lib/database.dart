@@ -31,10 +31,6 @@ class DatabaseProvider {
     final path = p.join(dbDir, 'expense_tracker.db');
     final key = await _encryptionService.obtainDatabaseKey();
     final keyHex = EncryptionService.keyToHex(key);
-    final isHex = RegExp(r'^[0-9a-fA-F]+$').hasMatch(keyHex);
-    if (!isHex) {
-      throw StateError('Database key must be hex');
-    }
 
     return openDatabase(
       path,
