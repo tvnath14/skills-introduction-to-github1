@@ -1,0 +1,28 @@
+name: expense_tracker_data_layer
+description: Data layer and sync protocol for LAN-only expense tracker (Flutter side)
+publish_to: "none"
+version: 0.0.1
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite: ^2.3.0
+  sqlcipher_flutter_libs: ^0.6.1
+  path: ^1.8.3
+  uuid: ^4.2.2
+  cryptography: ^2.5.0
+  crypto: ^3.0.3
+  flutter_secure_storage: ^9.0.0
+  nsd: ^4.0.0
+  mobile_scanner: ^5.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: false
+  assets:
+    - shared/default_categories.json
