@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
 use data_encoding::HEXLOWER;
-use dirs;
+use dirs::data_local_dir;
 use mdns::{RecordKind, Service};
 use rand::RngCore;
 use rcgen::{Certificate, CertificateParams, DistinguishedName, DnType, SanType};
@@ -42,10 +42,10 @@ pub struct SyncServer {
 }
 
 pub async fn run_sync_server(master_password: &str) -> Result<SyncServer> {
-    let db_path = dirs::data_local_dir()
+    let db_path = data_local_dir()
         .ok_or_else(|| anyhow!("missing data dir"))?
         .join("expense_tracker.db");
-    let salt_path = dirs::data_local_dir()
+    let salt_path = data_local_dir()
         .ok_or_else(|| anyhow!("missing data dir"))?
         .join("expense_tracker_salt");
     // Ensure database exists and is migrated.
@@ -85,7 +85,7 @@ pub async fn run_sync_server(master_password: &str) -> Result<SyncServer> {
                 )
                 .await;
                 if let Err(err) = result {
-                    eprintln!("sync session failed: {err:?}");
+                    eprintln!("sync session failed");
                 }
             });
         }

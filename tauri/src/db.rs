@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use rusqlite::{params, Connection, OpenFlags};
-use serde_json;
+use serde_json::Value;
 use std::path::Path;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -83,15 +83,15 @@ fn to_hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-pub fn insert_transaction(conn: &Connection, mut txn: serde_json::Value, aes_key: &[u8]) -> Result<()> {
+pub fn insert_transaction(conn: &Connection, mut txn: Value, aes_key: &[u8]) -> Result<()> {
     let now = OffsetDateTime::now_utc().format(&time::format_description::well_known::Rfc3339)?;
     let obj = txn.as_object_mut().ok_or_else(|| anyhow!("transaction must be object"))?;
-    obj.entry("id").or_insert_with(|| serde_json::Value::String(Uuid::new_v4().to_string()));
-    obj.insert("updated_at".into(), serde_json::Value::String(now.clone()));
-    obj.entry("created_at").or_insert_with(|| serde_json::Value::String(now.clone()));
+    obj.entry("id").or_insert_with(|| Value::String(Uuid::new_v4().to_string()));
+    obj.insert("updated_at".into(), Value::String(now.clone()));
+    obj.entry("created_at").or_insert_with(|| Value::String(now.clone()));
     if let Some(raw_sms) = obj.get("raw_sms").and_then(|v| v.as_str()) {
         let encrypted = encrypt_string(aes_key, raw_sms)?;
-        obj.insert("raw_sms".into(), serde_json::Value::String(encrypted));
+        obj.insert("raw_sms".into(), Value::String(encrypted));
     }
     conn.execute(
         "INSERT OR REPLACE INTO transactions (id, date, amount, type, merchant, description, category_id, raw_sms, source, confidence, flagged, month, created_at, updated_at, synced_at) VALUES (:id, :date, :amount, :type, :merchant, :description, :category_id, :raw_sms, :source, :confidence, :flagged, :month, :created_at, :updated_at, :synced_at)",

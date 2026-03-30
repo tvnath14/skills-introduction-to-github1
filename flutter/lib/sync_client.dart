@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:nsd/nsd.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'database.dart';
@@ -55,6 +56,7 @@ class SyncClient {
 
   Future<void> sync(PairedDevice device) async {
     final db = await _db.database;
+    final deviceId = await _localDeviceId(db);
     final lastSyncRows = await db.query('sync_state', limit: 1);
     final lastSync = lastSyncRows.isNotEmpty && lastSyncRows.first['last_sync'] != null
         ? DateTime.parse(lastSyncRows.first['last_sync'] as String)
@@ -66,7 +68,7 @@ class SyncClient {
 
     final payload = {
       'meta': {
-        'device_id': lastSyncRows.isNotEmpty ? lastSyncRows.first['device_id'] : const Uuid().v4(),
+        'device_id': deviceId,
         'last_sync': lastSync.toIso8601String(),
         'row_counts': await _rowCountsPerMonth(),
       },
@@ -151,5 +153,20 @@ class SyncClient {
       buffer.write(b.toRadixString(16).padLeft(2, '0'));
     }
     return buffer.toString();
+  }
+
+  Future<String> _localDeviceId(Database db) async {
+    final existing =
+        await db.query('settings', where: 'key = ?', whereArgs: ['device_id'], limit: 1);
+    if (existing.isNotEmpty) {
+      return existing.first['value'] as String;
+    }
+    final newId = const Uuid().v4();
+    await db.insert(
+      'settings',
+      {'key': 'device_id', 'value': newId},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    return newId;
   }
 }
