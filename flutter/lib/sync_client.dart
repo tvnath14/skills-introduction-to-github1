@@ -85,7 +85,7 @@ class SyncClient {
         final fp = _fingerprintFromCert(cert);
         return fp == device.fingerprint;
       },
-      supportedProtocols: ['tls13'],
+      supportedProtocols: ['tls1.3'],
     );
 
     final encoded = const JsonEncoder().convert(payload);

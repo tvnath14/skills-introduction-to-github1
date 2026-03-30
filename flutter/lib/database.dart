@@ -30,12 +30,17 @@ class DatabaseProvider {
     final dbDir = await getDatabasesPath();
     final path = p.join(dbDir, 'expense_tracker.db');
     final key = await _encryptionService.obtainDatabaseKey();
+    final keyHex = EncryptionService.keyToHex(key);
+    final isHex = RegExp(r'^[0-9a-fA-F]+$').hasMatch(keyHex);
+    if (!isHex) {
+      throw StateError('Database key must be hex');
+    }
 
     return openDatabase(
       path,
       version: 1,
       onConfigure: (db) async {
-        await db.execute("PRAGMA key = \"x'${EncryptionService.keyToHex(key)}'\";");
+        await db.execute("PRAGMA key = \"x'$keyHex'\";");
         await db.execute('PRAGMA foreign_keys = ON;');
       },
       onCreate: (db, version) async => _migrate(db),

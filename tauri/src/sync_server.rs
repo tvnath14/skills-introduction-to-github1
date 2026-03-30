@@ -42,6 +42,7 @@ pub struct SyncServer {
 }
 
 pub async fn run_sync_server(master_password: &str) -> Result<SyncServer> {
+    let master_password = Arc::<str>::from(master_password.to_owned());
     let db_path = data_local_dir()
         .ok_or_else(|| anyhow!("missing data dir"))?
         .join("expense_tracker.db");
@@ -69,11 +70,12 @@ pub async fn run_sync_server(master_password: &str) -> Result<SyncServer> {
                 Ok(s) => s,
                 Err(_) => continue,
             };
+            let peer_addr = stream.peer_addr().ok().map(|a| a.to_string());
             let acceptor = acceptor.clone();
             let shared_secret = shared_secret.clone();
             let db_path = db_path.clone();
             let salt_path = salt_path.clone();
-            let master_password = master_password.to_string();
+            let master_password = master_password.clone();
             tokio::spawn(async move {
                 let result = handle_client(
                     stream,
@@ -82,6 +84,7 @@ pub async fn run_sync_server(master_password: &str) -> Result<SyncServer> {
                     &salt_path,
                     &db_path,
                     &shared_secret,
+                    peer_addr,
                 )
                 .await;
                 if let Err(err) = result {
@@ -155,10 +158,11 @@ fn broadcast_mdns(port: u16) -> Result<mdns::ServiceDaemon> {
 async fn handle_client(
     stream: tokio::net::TcpStream,
     acceptor: TlsAcceptor,
-    master_password: &str,
+    master_password: &std::sync::Arc<str>,
     salt_path: &std::path::Path,
     db_path: &std::path::Path,
     shared_secret: &str,
+    peer_addr: Option<String>,
 ) -> Result<()> {
     let tls_stream = acceptor.accept(stream).await?;
     let peer_cert_fp = tls_stream
@@ -197,10 +201,10 @@ async fn handle_client(
         return Err(anyhow!("missing client certificate"));
     }
 
-    let conn = open_encrypted_db(master_password, salt_path, db_path)?;
+    let conn = open_encrypted_db(master_password.as_ref(), salt_path, db_path)?;
     conn.execute(
         "INSERT OR REPLACE INTO sync_state (device_id, last_sync, peer_device_name, peer_cert_fingerprint) VALUES (?1, ?2, ?3, ?4)",
-        rusqlite::params![payload.meta.device_id, payload.meta.last_sync, "mobile", peer_cert_fp],
+        rusqlite::params![payload.meta.device_id, payload.meta.last_sync, peer_addr, peer_cert_fp],
     )?;
 
     let response = build_payload(&conn, &payload.meta.last_sync)?;
